@@ -1,0 +1,7 @@
+import { Bell, ChevronDown, Menu, TrendingUp, X } from 'lucide-react'
+
+type Props = { onMenu: () => void; menuOpen: boolean }
+
+export function TopBar({ onMenu, menuOpen }: Props) {
+  return <header className="sticky top-0 z-20 flex min-h-12 items-center gap-2 bg-background/90 px-2 py-2 backdrop-blur md:min-h-16 md:gap-3 md:px-6 md:py-3"><button type="button" onClick={onMenu} aria-label={menuOpen ? 'Close menu' : 'Open menu'} className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground md:hidden">{menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}</button><TrendingUp className="hidden size-6 shrink-0 text-primary md:block lg:hidden" strokeWidth={2.75} aria-label="AlphaTrade" /><div className="ml-auto flex items-center gap-1 md:gap-4"><button type="button" className="relative rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground md:p-2" aria-label="Notifications, 1 unread"><Bell className="size-4 md:size-5" /><span className="absolute top-1 right-1 size-1.5 rounded-full bg-negative md:top-1.5 md:right-1.5 md:size-2" /></button><button type="button" className="flex items-center gap-2 rounded-full py-0.5 pr-1 md:py-1 md:pr-3"><span className="flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-medium md:size-9 md:text-sm">MS</span><span className="hidden text-sm font-medium md:inline">Manas Shukla</span><ChevronDown className="hidden size-4 text-muted-foreground md:block" /></button></div></header>
+}
