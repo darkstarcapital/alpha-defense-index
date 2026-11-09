@@ -1,17 +1,22 @@
+import os
 import time
 import requests
 import datetime
+from zoneinfo import ZoneInfo
 from supabase import create_client, Client
 
-# --- 1. CONFIGURATION (For Local Running) ---
-# 🚨 PASTE YOUR ACTUAL KEYS HERE (Keep the quotation marks!)
-SUPABASE_URL = "https://xkqyadgssduttoatjegy.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrcXlhZGdzc2R1dHRvYXRqZWd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3NjU5NzYsImV4cCI6MjEwOTM0MTk3Nn0.ho6TkQtBNFmTBFZ_B2m2mClt-2chlo3C71r-NL07DTs"
-UPSTOX_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI4SkIyNFUiLCJqdGkiOiI2YWViMjJlMjE2OWZmYjQxM2RmNTI3ZjMiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6dHJ1ZSwiaXNFeHRlbmRlZCI6dHJ1ZSwiaWF0IjoxNzkzNzk0Nzg2LCJpc3MiOiJ1ZGFwaS1nYXRld2F5LXNlcnZpY2UiLCJleHAiOjE4MjUzNjU2MDB9.-jD11w2q8FI4TtMF8GtjvNAn9PHHT-zyQqQnXrt9woQ"
+# --- 1. CONFIGURATION (Read from Render Environment Variables) ---
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN")
+
+if not all([SUPABASE_URL, SUPABASE_KEY, UPSTOX_ACCESS_TOKEN]):
+    print("❌ ERROR: Missing environment variables. Check Render settings.")
+    exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- 2. HARDCODED STOCKS (Using correct ISIN codes) ---
+# --- 2. HARDCODED STOCKS ---
 STOCKS = {
     "CYIENTDLM": {"key": "NSE_EQ|INE055S01018", "weight": 0.0088, "base": 691.05},
     "DCXINDIA": {"key": "NSE_EQ|INE0KL801015", "weight": 0.0038, "base": 308.85},
@@ -66,9 +71,10 @@ def calculate_index():
 
 # --- 4. POLL LIVE PRICES ---
 def poll_live_prices():
-    print("🚀 Darkstar Engine Started (Local Mode).")
+    print("🚀 Darkstar Engine Started on Cloud (Render).")
     while True:
-        now = datetime.datetime.now()
+        # FORCE INDIAN STANDARD TIME (IST)
+        now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
         current_time = now.time()
         current_day = now.weekday() # 0 is Monday, 5 is Saturday, 6 is Sunday
 
@@ -78,7 +84,7 @@ def poll_live_prices():
             time.sleep(3600)
             continue
 
-        # 2. Check for Market Hours (9:15 AM to 3:35 PM)
+        # 2. Check for Market Hours (9:15 AM to 3:35 PM IST)
         if current_time < datetime.time(9, 15) or current_time > datetime.time(15, 35):
             print("💤 Outside market hours. Sleeping for 5 minutes...")
             time.sleep(300) 
@@ -107,14 +113,6 @@ def poll_live_prices():
             else:
                 print(f"⚠️ API Error: {response.status_code} - {response.text}")
             
-            missing_tickers = []
-            for ticker, data in STOCKS.items():
-                if ticker not in live_prices:
-                    missing_tickers.append(ticker)
-            
-            if missing_tickers:
-                print(f"⚠️ Missing Tickers ({len(missing_tickers)}): {missing_tickers}")
-            
             current_index = calculate_index()
             print(f"📈 Live Index: {current_index} (Fetched {len(live_prices)} stocks)")
             
@@ -138,5 +136,5 @@ def poll_live_prices():
         except Exception as e:
             print(f"❌ Engine Error: {e}")
             
-        # Wait 1 second before the next tick
-        time.sleep(1)
+        # Wait 5 seconds before the next tick
+        time.sleep(5)
