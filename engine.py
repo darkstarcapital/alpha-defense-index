@@ -143,21 +143,29 @@ def poll_live_prices():
 # --- 5. FETCH MARKET NEWS ---
 def fetch_market_news():
     print("📰 News Fetcher Started...")
-    # Moneycontrol Latest News RSS Feed
-    rss_url = "https://www.moneycontrol.com/rss/latestnews.xml"
+    rss_url = "https://www.moneycontrol.com/rss/MCtopnews.xml"
     
     while True:
         try:
-            feed = feedparser.parse(rss_url)
-            news_data = []
+            # Add User-Agent so Moneycontrol doesn't block Render's server
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            print("🌐 Fetching news from Moneycontrol...")
             
-            # Get the top 10 latest articles
+            # Timeout is crucial so it doesn't freeze the thread
+            response = requests.get(rss_url, headers=headers, timeout=15)
+            print(f"📡 Response status: {response.status_code}")
+            
+            feed = feedparser.parse(response.content)
+            print(f"🔍 Found {len(feed.entries)} raw articles from feed.")
+            
+            if len(feed.entries) == 0:
+                print("⚠️ Feed returned 0 articles. The URL might be blocking us.")
+            
+            news_data = []
             for entry in feed.entries[:10]:
-                # 1. Clean the description (remove HTML tags if any)
                 description = entry.get('summary', 'No description available.')
                 description = re.sub('<[^<]+?>', '', description).strip()
                 
-                # 2. Extract Image (RSS feeds store this in different ways)
                 image_url = ""
                 if 'media_content' in entry:
                     image_url = entry.media_content[0]['url']
@@ -167,7 +175,6 @@ def fetch_market_news():
                             image_url = link['href']
                             break
                             
-                # 3. Create the dictionary
                 news_data.append({
                     "title": entry.title,
                     "link": entry.link,
@@ -176,14 +183,17 @@ def fetch_market_news():
                     "image_url": image_url
                 })
             
-            # Push to Supabase (clear old news and insert latest 10 to avoid duplicates)
-            if news_data:
-                supabase.table('market_news').delete().neq('id', 0).execute() # Clears old news
-                supabase.table('market_news').insert(news_data).execute() # Inserts fresh news
-                print(f"✅ Fetched and saved {len(news_data)} news articles.")
+            if len(news_data) > 0:
+                print(f"📥 Attempting to insert {len(news_data)} articles into Supabase...")
+                # Delete old news to avoid duplicates, then insert new
+                supabase.table('market_news').delete().neq('id', 0).execute()
+                supabase.table('market_news').insert(news_data).execute()
+                print(f"✅ Successfully saved {len(news_data)} news articles.")
+            else:
+                print("❌ No news_data array to insert.")
                 
         except Exception as e:
-            print(f"❌ News Error: {e}")
+            print(f"❌ NEWS FETCHER ERROR: {e}")
             
         # Wait 15 minutes (900 seconds) before fetching again
         time.sleep(900)
