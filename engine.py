@@ -2,6 +2,8 @@ import os
 import time
 import requests
 import datetime
+import feedparser
+import re
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
 
@@ -116,13 +118,13 @@ def poll_live_prices():
             current_index = calculate_index()
             print(f"📈 Live Index: {current_index} (Fetched {len(live_prices)} stocks)")
             
-            # 1. Push Index Value to Supabase
+            # Push Index Value to Supabase
             supabase.table('live_ticks').insert({
                 "index_name": "Darkstar Index",
                 "index_value": current_index
             }).execute()
 
-            # 2. Push Individual Stock Prices to Supabase
+            # Push Individual Stock Prices to Supabase
             stock_data_to_insert = []
             for ticker, price in live_prices.items():
                 stock_data_to_insert.append({
@@ -136,5 +138,52 @@ def poll_live_prices():
         except Exception as e:
             print(f"❌ Engine Error: {e}")
             
-        # Wait 5 seconds before the next tick
-        time.sleep(5)
+        time.sleep(5) # Wait 5 seconds before next tick
+
+# --- 5. FETCH MARKET NEWS ---
+def fetch_market_news():
+    print("📰 News Fetcher Started...")
+    # Moneycontrol Latest News RSS Feed
+    rss_url = "https://www.moneycontrol.com/rss/latestnews.xml"
+    
+    while True:
+        try:
+            feed = feedparser.parse(rss_url)
+            news_data = []
+            
+            # Get the top 10 latest articles
+            for entry in feed.entries[:10]:
+                # 1. Clean the description (remove HTML tags if any)
+                description = entry.get('summary', 'No description available.')
+                description = re.sub('<[^<]+?>', '', description).strip()
+                
+                # 2. Extract Image (RSS feeds store this in different ways)
+                image_url = ""
+                if 'media_content' in entry:
+                    image_url = entry.media_content[0]['url']
+                elif 'links' in entry:
+                    for link in entry.links:
+                        if 'image' in link.get('type', ''):
+                            image_url = link['href']
+                            break
+                            
+                # 3. Create the dictionary
+                news_data.append({
+                    "title": entry.title,
+                    "link": entry.link,
+                    "source": "Moneycontrol",
+                    "description": description,
+                    "image_url": image_url
+                })
+            
+            # Push to Supabase (clear old news and insert latest 10 to avoid duplicates)
+            if news_data:
+                supabase.table('market_news').delete().neq('id', 0).execute() # Clears old news
+                supabase.table('market_news').insert(news_data).execute() # Inserts fresh news
+                print(f"✅ Fetched and saved {len(news_data)} news articles.")
+                
+        except Exception as e:
+            print(f"❌ News Error: {e}")
+            
+        # Wait 15 minutes (900 seconds) before fetching again
+        time.sleep(900)

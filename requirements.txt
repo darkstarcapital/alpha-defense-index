@@ -1,5 +1,6 @@
+flask
+gunicorn
 requests
 supabase
 websocket-client
-flask
-gunicorn
+feedparser
