@@ -4,6 +4,7 @@ import requests
 import datetime
 import feedparser
 import re
+from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
 
@@ -140,6 +141,28 @@ def poll_live_prices():
             
         time.sleep(5) # Wait 5 seconds before next tick
 
+# --- Helper function to get the real image from the article ---
+def get_article_image(url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, headers=headers, timeout=5)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Look for the social media preview image
+        og_image = soup.find('meta', property='og:image')
+        if og_image and og_image.get('content'):
+            return og_image['content']
+            
+        # If not found, look for the Twitter image
+        twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
+        if twitter_image and twitter_image.get('content'):
+            return twitter_image['content']
+            
+    except Exception as e:
+        print(f"⚠️ Could not extract image for {url}: {e}")
+        
+    return "" # Return empty if no image found
+
 # --- 5. FETCH MARKET NEWS ---
 def fetch_market_news():
     print("📰 News Fetcher Started...")
@@ -147,34 +170,19 @@ def fetch_market_news():
     
     while True:
         try:
-            # Add User-Agent so Moneycontrol doesn't block Render's server
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-            print("🌐 Fetching news from Moneycontrol...")
-            
-            # Timeout is crucial so it doesn't freeze the thread
+            headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(rss_url, headers=headers, timeout=15)
-            print(f"📡 Response status: {response.status_code}")
-            
             feed = feedparser.parse(response.content)
-            print(f"🔍 Found {len(feed.entries)} raw articles from feed.")
-            
-            if len(feed.entries) == 0:
-                print("⚠️ Feed returned 0 articles. The URL might be blocking us.")
             
             news_data = []
             for entry in feed.entries[:10]:
                 description = entry.get('summary', 'No description available.')
                 description = re.sub('<[^<]+?>', '', description).strip()
                 
-                image_url = ""
-                if 'media_content' in entry:
-                    image_url = entry.media_content[0]['url']
-                elif 'links' in entry:
-                    for link in entry.links:
-                        if 'image' in link.get('type', ''):
-                            image_url = link['href']
-                            break
-                            
+                # Fetch the real image from the article link
+                print(f"🔍 Extracting image for: {entry.title[:30]}...")
+                image_url = get_article_image(entry.link)
+                
                 news_data.append({
                     "title": entry.title,
                     "link": entry.link,
@@ -185,15 +193,11 @@ def fetch_market_news():
             
             if len(news_data) > 0:
                 print(f"📥 Attempting to insert {len(news_data)} articles into Supabase...")
-                # Delete old news to avoid duplicates, then insert new
                 supabase.table('market_news').delete().neq('id', 0).execute()
                 supabase.table('market_news').insert(news_data).execute()
-                print(f"✅ Successfully saved {len(news_data)} news articles.")
-            else:
-                print("❌ No news_data array to insert.")
+                print(f"✅ Successfully saved {len(news_data)} news articles with unique images.")
                 
         except Exception as e:
             print(f"❌ NEWS FETCHER ERROR: {e}")
             
-        # Wait 15 minutes (900 seconds) before fetching again
         time.sleep(900)

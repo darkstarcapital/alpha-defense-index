@@ -4,3 +4,4 @@ requests
 supabase
 websocket-client
 feedparser
+beautifulsoup4
