@@ -1,0 +1,5 @@
+requests
+supabase
+websocket-client
+flask
+gunicorn
