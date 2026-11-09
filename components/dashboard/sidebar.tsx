@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import {
   BarChart3, Briefcase, Eye, Home, LineChart, Newspaper, Settings, ShieldCheck, TrendingUp,
 } from 'lucide-react'
@@ -29,7 +30,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           <ul className="flex flex-col gap-1">
             {NAV.map(({ label, icon: Icon, active, href }) => (
               <li key={label}>
-                <a 
+                <Link 
                   href={href} 
                   onClick={onClose} 
                   aria-current={active ? 'page' : undefined} 
@@ -40,7 +41,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
                 >
                   <Icon className={cn('size-4 shrink-0', active && 'text-primary')} aria-hidden="true" />
                   <span className="xl:inline">{label}</span>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
