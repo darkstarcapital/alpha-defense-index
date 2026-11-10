@@ -140,6 +140,7 @@ def get_article_image(url):
         response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.content, 'html.parser')
         
+        # 1. Try JSON-LD first (Often contains the highest quality image)
         scripts = soup.find_all('script', type='application/ld+json')
         for script in scripts:
             try:
@@ -156,11 +157,11 @@ def get_article_image(url):
                             if isinstance(img, dict) and 'url' in img: return img['url']
             except: pass
                 
+        # 2. Fallback to og:image (Keep original URL, no regex stripping)
         og_image = soup.find('meta', property='og:image')
         if og_image and og_image.get('content'):
-            img_url = og_image['content']
-            img_url = re.sub(r'-\d+x\d+(\.\w+)$', r'\1', img_url)
-            return img_url
+            return og_image['content'] 
+            
     except Exception as e:
         pass
     return ""
