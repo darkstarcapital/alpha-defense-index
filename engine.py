@@ -77,24 +77,20 @@ def calculate_index():
 def poll_live_prices():
     print("🚀 Darkstar Engine Started on Cloud (Render).")
     while True:
-        # FORCE INDIAN STANDARD TIME (IST)
         now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
         current_time = now.time()
-        current_day = now.weekday() # 0 is Monday, 5 is Saturday, 6 is Sunday
+        current_day = now.weekday()
 
-        # 1. Check for Weekend
         if current_day >= 5:
             print("💤 It's the weekend. Market is closed. Sleeping for 1 hour...")
             time.sleep(3600)
             continue
 
-        # 2. Check for Market Hours (9:15 AM to 3:35 PM IST)
         if current_time < datetime.time(9, 15) or current_time > datetime.time(15, 35):
             print("💤 Outside market hours. Sleeping for 5 minutes...")
             time.sleep(300) 
             continue
 
-        # 3. Market is OPEN - Fetch Data
         live_prices.clear() 
         try:
             all_keys = [data['key'] for data in STOCKS.values()]
@@ -120,19 +116,14 @@ def poll_live_prices():
             current_index = calculate_index()
             print(f"📈 Live Index: {current_index} (Fetched {len(live_prices)} stocks)")
             
-            # Push Index Value to Supabase
             supabase.table('live_ticks').insert({
                 "index_name": "Darkstar Index",
                 "index_value": current_index
             }).execute()
 
-            # Push Individual Stock Prices to Supabase
             stock_data_to_insert = []
             for ticker, price in live_prices.items():
-                stock_data_to_insert.append({
-                    "ticker": ticker,
-                    "price": price
-                })
+                stock_data_to_insert.append({"ticker": ticker, "price": price})
             
             if stock_data_to_insert:
                 supabase.table('stock_prices').insert(stock_data_to_insert).execute()
@@ -140,16 +131,15 @@ def poll_live_prices():
         except Exception as e:
             print(f"❌ Engine Error: {e}")
             
-        time.sleep(5) # Wait 5 seconds before next tick
+        time.sleep(5) 
 
-# --- Helper function to get the HD image from the article ---
+# --- Helper function to get HD images ---
 def get_article_image(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 1. Try to find the JSON-LD Schema (This usually has the HD image)
         scripts = soup.find_all('script', type='application/ld+json')
         for script in scripts:
             try:
@@ -164,56 +154,69 @@ def get_article_image(url):
                             img = item['image']
                             if isinstance(img, str): return img
                             if isinstance(img, dict) and 'url' in img: return img['url']
-            except:
-                pass
+            except: pass
                 
-        # 2. Fallback to og:image, and try to remove the small thumbnail dimensions
         og_image = soup.find('meta', property='og:image')
         if og_image and og_image.get('content'):
             img_url = og_image['content']
-            # Remove strings like "-770x433" from the image URL to get HD image
             img_url = re.sub(r'-\d+x\d+(\.\w+)$', r'\1', img_url)
             return img_url
-            
     except Exception as e:
-        print(f"⚠️ Could not extract image for {url}: {e}")
-        
+        pass
     return ""
 
-# --- 5. FETCH MARKET NEWS ---
+# --- 5. FETCH MARKET NEWS (Multi-Source, Every 12 Hours) ---
 def fetch_market_news():
     print("📰 News Fetcher Started...")
-    rss_url = "https://www.moneycontrol.com/rss/MCtopnews.xml"
+    
+    feeds = [
+        ("Moneycontrol", "https://www.moneycontrol.com/rss/MCtopnews.xml"),
+        ("Economic Times", "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"),
+        ("LiveMint", "https://www.livemint.com/rss/markets"),
+        ("Business Standard", "https://www.business-standard.com/rss/latest.rss")
+    ]
     
     while True:
-        try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(rss_url, headers=headers, timeout=15)
-            feed = feedparser.parse(response.content)
-            
-            news_data = []
-            for entry in feed.entries[:10]:
-                description = entry.get('summary', 'No description available.')
-                description = re.sub('<[^<]+?>', '', description).strip()
+        all_news = []
+        seen_titles = set()
+        
+        for source_name, rss_url in feeds:
+            try:
+                print(f"🌐 Fetching news from {source_name}...")
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                response = requests.get(rss_url, headers=headers, timeout=15)
+                feed = feedparser.parse(response.content)
                 
-                print(f"🔍 Extracting image for: {entry.title[:30]}...")
-                image_url = get_article_image(entry.link)
-                
-                news_data.append({
-                    "title": entry.title,
-                    "link": entry.link,
-                    "source": "Moneycontrol",
-                    "description": description,
-                    "image_url": image_url
-                })
+                for entry in feed.entries[:10]:
+                    if entry.title in seen_titles:
+                        continue
+                    seen_titles.add(entry.title)
+                    
+                    description = entry.get('summary', 'No description available.')
+                    description = re.sub('<[^<]+?>', '', description).strip()
+                    
+                    print(f"🔍 Extracting image for: {entry.title[:30]}...")
+                    image_url = get_article_image(entry.link)
+                    
+                    all_news.append({
+                        "title": entry.title,
+                        "link": entry.link,
+                        "source": source_name,
+                        "description": description,
+                        "image_url": image_url
+                    })
+            except Exception as e:
+                print(f"❌ News Error for {source_name}: {e}")
+        
+        if len(all_news) > 0:
+            final_news = all_news[:30]
+            print(f"📥 Attempting to insert {len(final_news)} articles into Supabase...")
+            supabase.table('market_news').delete().neq('id', 0).execute()
+            supabase.table('market_news').insert(final_news).execute()
+            print(f"✅ Successfully saved {len(final_news)} news articles.")
+        else:
+            print("❌ No news fetched from any source.")
             
-            if len(news_data) > 0:
-                print(f"📥 Attempting to insert {len(news_data)} articles into Supabase...")
-                supabase.table('market_news').delete().neq('id', 0).execute()
-                supabase.table('market_news').insert(news_data).execute()
-                print(f"✅ Successfully saved {len(news_data)} news articles with HD images.")
-                
-        except Exception as e:
-            print(f"❌ NEWS FETCHER ERROR: {e}")
-            
-        time.sleep(900)
+        # Wait 12 hours (43,200 seconds) before fetching again
+        print("💤 News updated. Sleeping for 12 hours...")
+        time.sleep(43200) 
