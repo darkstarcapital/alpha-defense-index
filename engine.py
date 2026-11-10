@@ -4,6 +4,7 @@ import requests
 import datetime
 import feedparser
 import re
+import json
 from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
@@ -141,27 +142,43 @@ def poll_live_prices():
             
         time.sleep(5) # Wait 5 seconds before next tick
 
-# --- Helper function to get the real image from the article ---
+# --- Helper function to get the HD image from the article ---
 def get_article_image(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Look for the social media preview image
+        # 1. Try to find the JSON-LD Schema (This usually has the HD image)
+        scripts = soup.find_all('script', type='application/ld+json')
+        for script in scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, dict) and 'image' in data:
+                    img = data['image']
+                    if isinstance(img, str): return img
+                    if isinstance(img, dict) and 'url' in img: return img['url']
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and 'image' in item:
+                            img = item['image']
+                            if isinstance(img, str): return img
+                            if isinstance(img, dict) and 'url' in img: return img['url']
+            except:
+                pass
+                
+        # 2. Fallback to og:image, and try to remove the small thumbnail dimensions
         og_image = soup.find('meta', property='og:image')
         if og_image and og_image.get('content'):
-            return og_image['content']
-            
-        # If not found, look for the Twitter image
-        twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
-        if twitter_image and twitter_image.get('content'):
-            return twitter_image['content']
+            img_url = og_image['content']
+            # Remove strings like "-770x433" from the image URL to get HD image
+            img_url = re.sub(r'-\d+x\d+(\.\w+)$', r'\1', img_url)
+            return img_url
             
     except Exception as e:
         print(f"⚠️ Could not extract image for {url}: {e}")
         
-    return "" # Return empty if no image found
+    return ""
 
 # --- 5. FETCH MARKET NEWS ---
 def fetch_market_news():
@@ -179,7 +196,6 @@ def fetch_market_news():
                 description = entry.get('summary', 'No description available.')
                 description = re.sub('<[^<]+?>', '', description).strip()
                 
-                # Fetch the real image from the article link
                 print(f"🔍 Extracting image for: {entry.title[:30]}...")
                 image_url = get_article_image(entry.link)
                 
@@ -195,7 +211,7 @@ def fetch_market_news():
                 print(f"📥 Attempting to insert {len(news_data)} articles into Supabase...")
                 supabase.table('market_news').delete().neq('id', 0).execute()
                 supabase.table('market_news').insert(news_data).execute()
-                print(f"✅ Successfully saved {len(news_data)} news articles with unique images.")
+                print(f"✅ Successfully saved {len(news_data)} news articles with HD images.")
                 
         except Exception as e:
             print(f"❌ NEWS FETCHER ERROR: {e}")
