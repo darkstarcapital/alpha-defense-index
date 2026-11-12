@@ -20,8 +20,8 @@ if not all([SUPABASE_URL, SUPABASE_KEY, UPSTOX_ACCESS_TOKEN]):
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- 2. HARDCODED STOCKS ---
-STOCKS = {
+# --- 2. NORTHMAN DEFENSE INDEX STOCKS ---
+DEFENSE_STOCKS = {
     "CYIENTDLM": {"key": "NSE_EQ|INE055S01018", "weight": 0.0088, "base": 691.05},
     "DCXINDIA": {"key": "NSE_EQ|INE0KL801015", "weight": 0.0038, "base": 308.85},
     "PTCIL": {"key": "NSE_EQ|INE596F01018", "weight": 0.0168, "base": 12950.00},
@@ -60,22 +60,44 @@ STOCKS = {
     "LMW": {"key": "NSE_EQ|INE269B01029", "weight": 0.0049, "base": 16384.2}
 }
 
+# --- 3. NORTHMAN BANK INDEX STOCKS ---
+BANK_STOCKS = {
+    "AUBANK": {"key": "NSE_EQ|INE949L01017", "weight": 0.0204, "base": 787.4},
+    "AXISBANK": {"key": "NSE_EQ|INE238A01034", "weight": 0.1384, "base": 1102.3},
+    "BANKBARODA": {"key": "NSE_EQ|INE028A01039", "weight": 0.0183, "base": 231.1},
+    "CANBK": {"key": "NSE_EQ|INE476A01022", "weight": 0.0161, "base": 87.5},
+    "CUB": {"key": "NSE_EQ|INE491A01021", "weight": 0.0081, "base": 111.75},
+    "FEDERALBNK": {"key": "NSE_EQ|INE171A01029", "weight": 0.0320, "base": 156.15},
+    "HDFCBANK": {"key": "NSE_EQ|INE040A01034", "weight": 0.1800, "base": 854.63},
+    "ICICIBANK": {"key": "NSE_EQ|INE090A01021", "weight": 0.1800, "base": 996.6},
+    "IDFCFIRSTB": {"key": "NSE_EQ|INE092T01019", "weight": 0.0192, "base": 88.9},
+    "INDIANB": {"key": "NSE_EQ|INE562A01011", "weight": 0.0120, "base": 420.9},
+    "INDUSINDBK": {"key": "NSE_EQ|INE095A01012", "weight": 0.0218, "base": 1598.95},
+    "KARURVYSYA": {"key": "NSE_EQ|INE036D01028", "weight": 0.0129, "base": 140.75},
+    "KOTAKBANK": {"key": "NSE_EQ|INE237A01036", "weight": 0.1289, "base": 381.62},
+    "PNB": {"key": "NSE_EQ|INE160A01022", "weight": 0.0176, "base": 95.75},
+    "RBLBANK": {"key": "NSE_EQ|INE976G01028", "weight": 0.0086, "base": 279.3},
+    "SBIN": {"key": "NSE_EQ|INE062A01020", "weight": 0.1607, "base": 642.05},
+    "UNIONBANK": {"key": "NSE_EQ|INE692A01016", "weight": 0.0140, "base": 119.1},
+    "YESBANK": {"key": "NSE_EQ|INE528G01035", "weight": 0.0110, "base": 21.45}
+}
+
 live_prices = {}
 
-# --- 3. CALCULATE INDEX ---
-def calculate_index():
+# --- 4. CALCULATE INDEX ---
+def calculate_index(stock_dict, live_price_data):
     total_value = 0
-    for ticker, data in STOCKS.items():
-        if ticker in live_prices:
-            current_price = live_prices[ticker]
+    for ticker, data in stock_dict.items():
+        if ticker in live_price_data:
+            current_price = live_price_data[ticker]
             total_value += (current_price / data['base']) * data['weight']
         else:
             total_value += 1 * data['weight']
     return round(total_value * 10000, 2)
 
-# --- 4. POLL LIVE PRICES ---
+# --- 5. POLL LIVE PRICES ---
 def poll_live_prices():
-    print("🚀 Darkstar Engine Started on Cloud (Render).")
+    print("🚀 Northman Engine Started on Cloud (Render).")
     while True:
         now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
         current_time = now.time()
@@ -93,7 +115,11 @@ def poll_live_prices():
 
         live_prices.clear() 
         try:
-            all_keys = [data['key'] for data in STOCKS.values()]
+            # Combine keys from BOTH dictionaries
+            defense_keys = [data['key'] for data in DEFENSE_STOCKS.values()]
+            bank_keys = [data['key'] for data in BANK_STOCKS.values()]
+            all_keys = defense_keys + bank_keys
+            
             keys_string = ",".join(all_keys)
             url = "https://api.upstox.com/v2/market-quote/ltp"
             
@@ -113,14 +139,20 @@ def poll_live_prices():
             else:
                 print(f"⚠️ API Error: {response.status_code} - {response.text}")
             
-            current_index = calculate_index()
-            print(f"📈 Live Index: {current_index} (Fetched {len(live_prices)} stocks)")
+            # Calculate both indices
+            defense_index = calculate_index(DEFENSE_STOCKS, live_prices)
+            bank_index = calculate_index(BANK_STOCKS, live_prices)
             
-            supabase.table('live_ticks').insert({
-                "index_name": "Darkstar Index",
-                "index_value": current_index
-            }).execute()
+            print(f"📈 Northman Defense Index: {defense_index}")
+            print(f"🏦 Northman Bank Index: {bank_index}")
+            
+            # Push BOTH index values to Supabase
+            supabase.table('live_ticks').insert([
+                {"index_name": "Northman Defense Index", "index_value": defense_index},
+                {"index_name": "Northman Bank Index", "index_value": bank_index}
+            ]).execute()
 
+            # Push Individual Stock Prices to Supabase
             stock_data_to_insert = []
             for ticker, price in live_prices.items():
                 stock_data_to_insert.append({"ticker": ticker, "price": price})
@@ -140,7 +172,6 @@ def get_article_image(url):
         response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 1. Try JSON-LD first (Often contains the highest quality image)
         scripts = soup.find_all('script', type='application/ld+json')
         for script in scripts:
             try:
@@ -157,16 +188,14 @@ def get_article_image(url):
                             if isinstance(img, dict) and 'url' in img: return img['url']
             except: pass
                 
-        # 2. Fallback to og:image (Keep original URL, no regex stripping)
         og_image = soup.find('meta', property='og:image')
         if og_image and og_image.get('content'):
             return og_image['content'] 
-            
     except Exception as e:
         pass
     return ""
 
-# --- 5. FETCH MARKET NEWS (Multi-Source, Every 12 Hours) ---
+# --- 6. FETCH MARKET NEWS (Multi-Source, Every 12 Hours) ---
 def fetch_market_news():
     print("📰 News Fetcher Started...")
     
@@ -218,6 +247,5 @@ def fetch_market_news():
         else:
             print("❌ No news fetched from any source.")
             
-        # Wait 12 hours (43,200 seconds) before fetching again
         print("💤 News updated. Sleeping for 12 hours...")
         time.sleep(43200) 
