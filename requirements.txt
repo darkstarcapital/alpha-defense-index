@@ -5,3 +5,4 @@ supabase
 websocket-client
 feedparser
 beautifulsoup4
+tzdata

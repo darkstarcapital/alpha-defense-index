@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import requests
 import datetime
@@ -8,6 +9,9 @@ import json
 from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 from supabase import create_client, Client
+
+# --- FORCE LOGS TO SHOW INSTANTLY ON RENDER ---
+sys.stdout.reconfigure(line_buffering=True)
 
 # --- 1. CONFIGURATION (Read from Render Environment Variables) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -99,23 +103,24 @@ def calculate_index(stock_dict, live_price_data):
 def poll_live_prices():
     print("🚀 Northman Engine Started on Cloud (Render).")
     while True:
-        now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
-        current_time = now.time()
-        current_day = now.weekday()
-
-        if current_day >= 5:
-            print("💤 It's the weekend. Market is closed. Sleeping for 1 hour...")
-            time.sleep(3600)
-            continue
-
-        if current_time < datetime.time(9, 15) or current_time > datetime.time(15, 35):
-            print("💤 Outside market hours. Sleeping for 5 minutes...")
-            time.sleep(300) 
-            continue
-
-        live_prices.clear() 
         try:
-            # Combine keys from BOTH dictionaries
+            # We moved this INSIDE the try block so if the timezone fails, it logs it!
+            now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+            current_time = now.time()
+            current_day = now.weekday()
+
+            if current_day >= 5:
+                print("💤 It's the weekend. Market is closed. Sleeping for 1 hour...")
+                time.sleep(3600)
+                continue
+
+            if current_time < datetime.time(9, 15) or current_time > datetime.time(15, 35):
+                print("💤 Outside market hours. Sleeping for 5 minutes...")
+                time.sleep(300) 
+                continue
+
+            live_prices.clear() 
+            
             defense_keys = [data['key'] for data in DEFENSE_STOCKS.values()]
             bank_keys = [data['key'] for data in BANK_STOCKS.values()]
             all_keys = defense_keys + bank_keys
@@ -129,7 +134,7 @@ def poll_live_prices():
             }
             params = {"instrument_key": keys_string}
             
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers, params=params, timeout=10)
             
             if response.status_code == 200:
                 data = response.json().get('data', {})
@@ -139,20 +144,17 @@ def poll_live_prices():
             else:
                 print(f"⚠️ API Error: {response.status_code} - {response.text}")
             
-            # Calculate both indices
             defense_index = calculate_index(DEFENSE_STOCKS, live_prices)
             bank_index = calculate_index(BANK_STOCKS, live_prices)
             
             print(f"📈 Northman Defense Index: {defense_index}")
             print(f"🏦 Northman Bank Index: {bank_index}")
             
-            # Push BOTH index values to Supabase
             supabase.table('live_ticks').insert([
                 {"index_name": "Northman Defense Index", "index_value": defense_index},
                 {"index_name": "Northman Bank Index", "index_value": bank_index}
             ]).execute()
 
-            # Push Individual Stock Prices to Supabase
             stock_data_to_insert = []
             for ticker, price in live_prices.items():
                 stock_data_to_insert.append({"ticker": ticker, "price": price})
@@ -161,7 +163,8 @@ def poll_live_prices():
                 supabase.table('stock_prices').insert(stock_data_to_insert).execute()
             
         except Exception as e:
-            print(f"❌ Engine Error: {e}")
+            print(f"❌ Engine Loop Error: {e}")
+            time.sleep(10) # Wait 10 seconds before trying again if it crashes
             
         time.sleep(5) 
 
@@ -207,45 +210,49 @@ def fetch_market_news():
     ]
     
     while True:
-        all_news = []
-        seen_titles = set()
-        
-        for source_name, rss_url in feeds:
-            try:
-                print(f"🌐 Fetching news from {source_name}...")
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-                response = requests.get(rss_url, headers=headers, timeout=15)
-                feed = feedparser.parse(response.content)
-                
-                for entry in feed.entries[:10]:
-                    if entry.title in seen_titles:
-                        continue
-                    seen_titles.add(entry.title)
-                    
-                    description = entry.get('summary', 'No description available.')
-                    description = re.sub('<[^<]+?>', '', description).strip()
-                    
-                    print(f"🔍 Extracting image for: {entry.title[:30]}...")
-                    image_url = get_article_image(entry.link)
-                    
-                    all_news.append({
-                        "title": entry.title,
-                        "link": entry.link,
-                        "source": source_name,
-                        "description": description,
-                        "image_url": image_url
-                    })
-            except Exception as e:
-                print(f"❌ News Error for {source_name}: {e}")
-        
-        if len(all_news) > 0:
-            final_news = all_news[:30]
-            print(f"📥 Attempting to insert {len(final_news)} articles into Supabase...")
-            supabase.table('market_news').delete().neq('id', 0).execute()
-            supabase.table('market_news').insert(final_news).execute()
-            print(f"✅ Successfully saved {len(final_news)} news articles.")
-        else:
-            print("❌ No news fetched from any source.")
+        try:
+            all_news = []
+            seen_titles = set()
             
+            for source_name, rss_url in feeds:
+                try:
+                    print(f"🌐 Fetching news from {source_name}...")
+                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                    response = requests.get(rss_url, headers=headers, timeout=15)
+                    feed = feedparser.parse(response.content)
+                    
+                    for entry in feed.entries[:10]:
+                        if entry.title in seen_titles:
+                            continue
+                        seen_titles.add(entry.title)
+                        
+                        description = entry.get('summary', 'No description available.')
+                        description = re.sub('<[^<]+?>', '', description).strip()
+                        
+                        print(f"🔍 Extracting image for: {entry.title[:30]}...")
+                        image_url = get_article_image(entry.link)
+                        
+                        all_news.append({
+                            "title": entry.title,
+                            "link": entry.link,
+                            "source": source_name,
+                            "description": description,
+                            "image_url": image_url
+                        })
+                except Exception as e:
+                    print(f"❌ News Error for {source_name}: {e}")
+            
+            if len(all_news) > 0:
+                final_news = all_news[:30]
+                print(f"📥 Attempting to insert {len(final_news)} articles into Supabase...")
+                supabase.table('market_news').delete().neq('id', 0).execute()
+                supabase.table('market_news').insert(final_news).execute()
+                print(f"✅ Successfully saved {len(final_news)} news articles.")
+            else:
+                print("❌ No news fetched from any source.")
+                
+        except Exception as e:
+             print(f"❌ News Loop Error: {e}")
+             
         print("💤 News updated. Sleeping for 12 hours...")
         time.sleep(43200) 
