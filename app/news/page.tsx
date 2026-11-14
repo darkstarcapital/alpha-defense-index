@@ -31,7 +31,7 @@ export default function MarketNews() {
           .from("market_news")
           .select("*")
           .order("created_at", { ascending: false })
-          .limit(10);
+          .limit(100);
 
         if (error) throw error;
         if (data) setArticles(data);
