@@ -104,7 +104,6 @@ def poll_live_prices():
     print("🚀 Northman Engine Started on Cloud (Render).")
     while True:
         try:
-            # We moved this INSIDE the try block so if the timezone fails, it logs it!
             now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
             current_time = now.time()
             current_day = now.weekday()
@@ -164,7 +163,7 @@ def poll_live_prices():
             
         except Exception as e:
             print(f"❌ Engine Loop Error: {e}")
-            time.sleep(10) # Wait 10 seconds before trying again if it crashes
+            time.sleep(10)
             
         time.sleep(5) 
 
@@ -198,7 +197,7 @@ def get_article_image(url):
         pass
     return ""
 
-# --- 6. FETCH MARKET NEWS (Multi-Source, Every 12 Hours) ---
+# --- 6. FETCH MARKET NEWS (Smart Filtering) ---
 def fetch_market_news():
     print("📰 News Fetcher Started...")
     
@@ -214,6 +213,10 @@ def fetch_market_news():
             all_news = []
             seen_titles = set()
             
+            # Calculate exactly 24 hours ago (in UTC time)
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            time_threshold = now_utc - datetime.timedelta(hours=24)
+            
             for source_name, rss_url in feeds:
                 try:
                     print(f"🌐 Fetching news from {source_name}...")
@@ -221,9 +224,20 @@ def fetch_market_news():
                     response = requests.get(rss_url, headers=headers, timeout=15)
                     feed = feedparser.parse(response.content)
                     
-                    for entry in feed.entries[:10]:
+                    for entry in feed.entries[:30]:
                         if entry.title in seen_titles:
                             continue
+                        
+                        # SMART FILTER: Check the publish date
+                        is_recent = True
+                        if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                            pub_time = datetime.datetime.fromtimestamp(time.mktime(entry.published_parsed), tz=datetime.timezone.utc)
+                            if pub_time < time_threshold:
+                                is_recent = False
+                                
+                        if not is_recent:
+                            continue
+                            
                         seen_titles.add(entry.title)
                         
                         description = entry.get('summary', 'No description available.')
@@ -243,13 +257,15 @@ def fetch_market_news():
                     print(f"❌ News Error for {source_name}: {e}")
             
             if len(all_news) > 0:
-                final_news = all_news[:30]
-                print(f"📥 Attempting to insert {len(final_news)} articles into Supabase...")
+                final_news = all_news[:100] 
+                print(f"📥 Attempting to insert {len(final_news)} FRESH articles into Supabase...")
+                
+                # Wipe the old table so only fresh news stays
                 supabase.table('market_news').delete().neq('id', 0).execute()
                 supabase.table('market_news').insert(final_news).execute()
-                print(f"✅ Successfully saved {len(final_news)} news articles.")
+                print(f"✅ Successfully saved {len(final_news)} fresh news articles.")
             else:
-                print("❌ No news fetched from any source.")
+                print("❌ No recent news found in the last 24 hours.")
                 
         except Exception as e:
              print(f"❌ News Loop Error: {e}")
