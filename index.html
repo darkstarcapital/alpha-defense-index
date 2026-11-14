@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+window.onerror=function(msg,src,line,col,err){window.parent.postMessage({type:'app-error',message:msg,source:src,lineno:line,colno:col,stack:err&&err.stack||''},'*');};
+window.onunhandledrejection=function(e){window.parent.postMessage({type:'app-error',message:'Unhandled promise rejection: '+(e.reason&&e.reason.message||e.reason||'unknown'),stack:e.reason&&e.reason.stack||''},'*');};
+window.addEventListener('error',function(e){var t=e&&e.target;if(t&&t!==window&&t.tagName==='SCRIPT'){var u=t.src||'';window.parent.postMessage({type:'app-error',message:'Failed to load script'+(u?': '+u:' (inline module)'),source:u},'*');}},true);
+(function(){var _f=window.fetch;window.fetch=function(){var a=arguments,u=typeof a[0]==='string'?a[0]:(a[0]&&a[0].url)||'';var p=_f.apply(this,a);p.then(function(r){if(r.status===500){r.clone().text().then(function(b){window.parent.postMessage({type:'fetch-error',url:u,status:500,body:b},'*');}).catch(function(){window.parent.postMessage({type:'fetch-error',url:u,status:500,body:''},'*');});}}).catch(function(e){window.parent.postMessage({type:'fetch-error',url:u,status:0,body:e.message||'fetch failed'},'*');});return p;};})();
+</script>
+<script src="https://builder.puter.com/runtime.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0B1120" />
+<title>Northman Bank Index</title>
+<meta name="description" content="Track. Analyze. Invest. — India's Next Gen Banking Index" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] } } } };
+</script>
+<style>html,body{background:#0B1120;color:#fff;font-family:Inter,ui-sans-serif,system-ui,sans-serif}</style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1",
+    "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18.3.1,react-dom@18.3.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.441.0?deps=react@18.3.1"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+    <!-- puter-pwa: generated, do not edit -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Northman">
+    <!-- /puter-pwa -->
+</head>
+<body class="bg-[#0B1120] text-white antialiased">
+<div id="root"><div style="display:flex;height:100vh;align-items:center;justify-content:center;color:#64748B;font-size:12px">Loading dashboard…</div></div>
+
+<!-- Browser preview of the Next.js page: runs the same component and serves the
+     /api/index-data route from the same mock data module. -->
+<script type="module">
+import { getIndexData } from './lib/bankData.js';
+
+const nativeFetch = window.fetch;
+window.fetch = function (input, init) {
+  const url = typeof input === 'string' ? input : (input && input.url) || '';
+  if (url.includes('/api/index-data')) {
+    const params = new URL(url, location.href).searchParams;
+    const data = getIndexData(params.get('index') || 'bank', params.get('range') || '1D');
+    const body = data ? JSON.stringify(data) : JSON.stringify({ error: 'Unknown index' });
+    return Promise.resolve(new Response(body, { status: data ? 200 : 404, headers: { 'Content-Type': 'application/json' } }));
+  }
+  return nativeFetch.apply(this, arguments);
+};
+
+const src = await (await nativeFetch('components/BankDashboard.jsx')).text();
+const code = Babel.transform(src, { presets: [['react', { runtime: 'classic' }]], sourceType: 'module' }).code;
+const mod = await import(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+const React = await import('react');
+const { createRoot } = await import('react-dom/client');
+createRoot(document.getElementById('root')).render(React.createElement(mod.default));
+</script>
+</body>
+</html>
