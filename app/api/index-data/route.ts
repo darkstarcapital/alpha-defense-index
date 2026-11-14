@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase/client'
 
-// This ensures Next.js doesn't cache the API route
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
@@ -9,26 +8,41 @@ export async function GET(request: Request) {
     const supabase = createSupabaseClient()
     const { searchParams } = new URL(request.url)
     
-    // Check if the frontend is asking for the bank index, otherwise default to defense
+    // Default to Defense, but allow ?index=bank later
     const indexParam = searchParams.get('index')
     const indexName = indexParam === 'bank' 
       ? 'Northman Bank Index' 
       : 'Northman Defense Index'
 
-    // 1. Fetch ONLY the specific index from Supabase
-    const { data, error } = await supabase
+    // 1. Fetch chart history for the specific index
+    const { data: chartData, error: chartError } = await supabase
       .from('live_ticks')
       .select('created_at, index_value')
-      .eq('index_name', indexName) // 🔥 THIS IS THE MAGIC FILTER
+      .eq('index_name', indexName)
       .order('created_at', { ascending: false })
-      .limit(150) // Get the latest 150 ticks
+      .limit(150)
 
-    if (error) throw error
+    if (chartError) throw chartError
 
-    // 2. Reverse the data so the chart draws from oldest to newest
-    const chartData = data.reverse()
+    // Get the latest value
+    const latestValue = chartData && chartData.length > 0 ? chartData[0].index_value : 0
 
-    return NextResponse.json(chartData)
+    // 2. Fetch the latest stock prices (for the table)
+    // We grab the latest 54 records to cover both Defense and Bank
+    const { data: stockData, error: stockError } = await supabase
+      .from('stock_prices')
+      .select('ticker, price, created_at')
+      .order('created_at', { ascending: false })
+      .limit(54)
+
+    if (stockError) throw stockError
+
+    // 3. Return the exact format the frontend expects
+    return NextResponse.json({
+      indexValue: latestValue,
+      chartData: chartData.reverse(), // Oldest to newest for the chart
+      stocks: stockData || []
+    })
 
   } catch (error: any) {
     console.error("API Error:", error)
