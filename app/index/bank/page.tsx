@@ -1,45 +1,38 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
   PieChart, Pie, Cell, LineChart, Line,
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Info, ArrowRight, ArrowUpRight, ArrowDownRight, Search,
-  ShieldCheck, Triangle, 
+  Triangle, 
 } from 'lucide-react';
-
-// Import your actual layout components
-import { Sidebar } from '@/components/dashboard/sidebar';
-import { TopBar } from '@/components/dashboard/top-bar';
-import { BottomNav } from '@/components/ui/bottom-nav';
 
 /* ---------- Theme ---------- */
 const GREEN = '#22E58F';
 const RED = '#FF4D5E';
-const BLUE = '#3B82F6';
-const BG = '#050505'; // Updated to match your new black theme
+const BG = '#050505';
 
 const RANGES = ['1D', '1W', '1M', '3M', '1Y', 'ALL'];
 
 const SUMMARY = [
-  { label: 'Total Market Cap', value: '₹ 54,86,614 Cr' },
+  { label: 'Total Market Cap', value: '₹ 12,45,300 Cr' },
   { label: 'No. of Companies', value: '18' },
-  { label: 'Top 5 Weightage', value: '61.69%', delta: '+0.21%' },
-  { label: 'Net Interest Margin (Avg.)', value: '3.42%', delta: '+0.06%' },
-  { label: 'Total Return (2Y)', value: '+38.52%' },
+  { label: 'Top 5 Weightage', value: '58.42%', delta: '+0.12%' },
+  { label: 'Banking Revenue (Avg.)', value: '52.10%', delta: '+0.85%' },
+  { label: 'Total Return (2Y)', value: '+18.45%' },
   { label: 'Methodology', value: 'Free-Float Market Cap' },
   { label: 'Launch Date', value: '18-Oct-2024' },
-  { label: 'Index P/E', value: '15.8' },
-  { label: 'Total Net Profit', value: '₹ 3,12,480 Cr' },
-  { label: 'Avg Loan Book Growth', value: '+14.6%' },
+  { label: 'Index P/E', value: '22.8' },
+  { label: 'Total Banking Revenue', value: '₹ 85,200 Cr' },
+  { label: 'Avg Revenue Growth', value: '+14.2%' },
 ];
 
 const FALLBACK = {
-  value: 12106.9, changePercent: 21.06, changePoints: 2106.9,
-  high: 12150.2, low: 12050.1, open: 12080.0, constituents: 18,
+  value: 12500.00, changePercent: 1.45, changePoints: 180.50,
+  high: 12600.0, low: 12350.0, open: 12400.0, constituents: 18,
 };
 
 /* ---------- Helpers ---------- */
@@ -59,7 +52,7 @@ function timeLabel(iso: string, range: string) {
 
 const PERF = (() => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const bank = [100, 101.2, 100.4, 103.1, 105.6, 104.8, 108.2, 110.9, 112.4, 115.8, 118.1, 121.1];
+  const bank = [100, 101.2, 100.4, 103.1, 105.6, 104.8, 108.2, 110.9, 112.4, 115.8, 118.1, 124.7];
   const nifty = [100, 100.6, 99.8, 101.4, 102.9, 103.4, 104.6, 106.1, 107.3, 108.9, 110.4, 112.0];
   return months.map((m, i) => ({ m, bank: bank[i], nifty: nifty[i] }));
 })();
@@ -101,40 +94,43 @@ function Hero({ data, range, setRange }: any) {
         </div>
       </div>
 
-      <div className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl text-white">
-        {fmtUS(data.value)}
-      </div>
+      {/* FIXED: Price & Gain always side-by-side */}
+      <div className="mt-2 flex flex-row items-center gap-3 sm:gap-4">
+        <div className="text-4xl font-bold tracking-tight sm:text-5xl text-white">
+          {fmtUS(data.value)}
+        </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-x-10 gap-y-4">
-        <div>
+        <div className="flex flex-col">
           <div
-            className={`inline-flex items-center gap-1 rounded px-2 py-[4px] text-[12px] font-semibold ${
+            className={`inline-flex w-fit items-center gap-1 rounded px-2 py-[4px] text-[12px] font-semibold ${
               up ? 'bg-[#22E58F]/10 text-[#22E58F]' : 'bg-[#FF4D5E]/10 text-[#FF4D5E]'
             }`}
           >
             {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
             {signed(data.changePercent)}%
           </div>
-          <div className="mt-1.5 text-[10px]">
+          <div className="mt-1 text-[10px]">
             <span className={`font-medium ${up ? 'text-[#22E58F]' : 'text-[#FF4D5E]'}`}>
               {signed(data.changePoints)}
             </span>
             <span className="ml-2 text-slate-400">Today</span>
           </div>
         </div>
-        <div className="grid flex-1 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4 sm:pl-4">
-          {[
-            ['Intraday High', fmtUS(data.high)],
-            ['Intraday Low', fmtUS(data.low)],
-            ["Today's Open", fmtUS(data.open)],
-            ['Constituents', data.constituents],
-          ].map(([l, v]) => (
-            <div key={l}>
-              <div className="text-[10px] text-slate-400">{l}</div>
-              <div className="mt-0.5 text-[12px] font-semibold">{v}</div>
-            </div>
-          ))}
-        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
+        {[
+          ['Intraday High', fmtUS(data.high)],
+          ['Intraday Low', fmtUS(data.low)],
+          ["Today's Open", fmtUS(data.open)],
+          ['Constituents', data.constituents],
+        ].map(([l, v]) => (
+          <div key={l}>
+            <div className="text-[10px] text-slate-400">{l}</div>
+            <div className="mt-0.5 text-[12px] font-semibold">{v}</div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -185,17 +181,10 @@ function MainChart({ chartData, range, loading }: any) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="bankFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={BLUE} stopOpacity={0.45} />
-                <stop offset="100%" stopColor={BLUE} stopOpacity={0.02} />
+              <linearGradient id="defFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={GREEN} stopOpacity={0.45} />
+                <stop offset="100%" stopColor={GREEN} stopOpacity={0.02} />
               </linearGradient>
-              <filter id="bankGlow" x="-10%" y="-50%" width="120%" height="200%">
-                <feGaussianBlur stdDeviation="3.5" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
             </defs>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical horizontal />
             <XAxis
@@ -223,21 +212,15 @@ function MainChart({ chartData, range, loading }: any) {
             <Area
               type="monotone"
               dataKey="index_value"
-              stroke={BLUE}
+              stroke={GREEN}
               strokeWidth={2}
-              fill="url(#bankFill)"
-              filter="url(#bankGlow)"
+              fill="url(#defFill)"
               dot={false}
-              activeDot={{ r: 4, fill: BLUE, stroke: BG, strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: GREEN, stroke: BG, strokeWidth: 2 }}
               isAnimationActive={false}
             />
             {last != null && (
-              <ReferenceLine
-                y={last}
-                stroke={BLUE}
-                strokeDasharray="2 3"
-                label={<LastValueLabel value={last} />}
-              />
+              <ReferenceLine y={last} stroke={GREEN} strokeDasharray="2 3" label={<LastValueLabel value={last} />} />
             )}
           </AreaChart>
         </ResponsiveContainer>
@@ -248,7 +231,13 @@ function MainChart({ chartData, range, loading }: any) {
 
 /* ---------- Right panel ---------- */
 function PortfolioBreakdown({ count }: any) {
-  const pie = [{ name: 'Banking Sector', value: 100 }];
+  const pie = [
+    { name: 'Private Banks', value: 65 },
+    { name: 'PSU Banks', value: 23 },
+    { name: 'NBFCs', value: 12 }
+  ];
+  const COLORS = [GREEN, '#3B82F6', '#64748B'];
+
   return (
     <section>
       <div className="flex items-center justify-between">
@@ -259,18 +248,9 @@ function PortfolioBreakdown({ count }: any) {
       <div className="relative mx-auto mt-4 h-[120px] w-[120px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie
-              data={pie}
-              dataKey="value"
-              innerRadius={45}
-              outerRadius={58}
-              startAngle={90}
-              endAngle={-270}
-              stroke="none"
-              isAnimationActive={false}
-            >
-              {pie.map((p) => (
-                <Cell key={p.name} fill={BLUE} />
+            <Pie data={pie} dataKey="value" innerRadius={45} outerRadius={58} startAngle={90} endAngle={-270} stroke="none" isAnimationActive={false}>
+              {pie.map((entry, index) => (
+                <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
           </PieChart>
@@ -281,15 +261,15 @@ function PortfolioBreakdown({ count }: any) {
         </div>
       </div>
       <div className="mt-4 space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-2 text-slate-200">
-            <span className="h-2 w-2 rounded-full" style={{ background: BLUE }} />
-            Banking Sector
-          </span>
-          <span>
-            <span className="font-semibold">100%</span>
-          </span>
-        </div>
+        {pie.map((item, i) => (
+          <div key={item.name} className="flex items-center justify-between text-[11px]">
+            <span className="flex items-center gap-2 text-slate-200">
+              <span className="h-2 w-2 rounded-full" style={{ background: COLORS[i] }} />
+              {item.name}
+            </span>
+            <span><span className="font-semibold">{item.value}%</span></span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -301,30 +281,20 @@ function Performance() {
       <h2 className="text-[13px] font-semibold">Performance vs Benchmark (1Y)</h2>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
         <span className="flex items-center gap-1.5 text-[#22E58F]">
-          <span className="h-2 w-2 rounded-full bg-[#22E58F]" /> Northman Bank: +21.1%
+          <span className="h-2 w-2 rounded-full bg-[#22E58F]" /> Alpha Bank: +24.7%
         </span>
         <span className="flex items-center gap-1.5 text-slate-300">
           <span className="h-2 w-2 rounded-full bg-slate-400" /> Nifty 50: <span className="text-[#22E58F]">+12.0%</span>
         </span>
       </div>
-      <div className="mt-1 text-[10px] text-white">Alpha (Outperformance): +9.1%</div>
+      <div className="mt-1 text-[10px] text-white">Alpha (Outperformance): +12.7%</div>
       <div className="mt-3 h-[120px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={PERF} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="m" tick={{ fill: '#64748B', fontSize: 9 }} axisLine={false} tickLine={false} interval={2} />
-            <YAxis
-              domain={[96, 124]}
-              ticks={[96, 104, 112, 120]}
-              tick={{ fill: '#94A3B8', fontSize: 9 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              contentStyle={{ background: '#111A2C', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, fontSize: 10 }}
-              labelStyle={{ color: '#94A3B8' }}
-            />
-            <Line type="monotone" dataKey="bank" name="Northman Bank" stroke={GREEN} strokeWidth={2} dot={false} isAnimationActive={false} />
+            <YAxis domain={[96, 130]} ticks={[96, 108, 120, 132]} tick={{ fill: '#94A3B8', fontSize: 9 }} axisLine={false} tickLine={false} />
+            <Line type="monotone" dataKey="bank" name="Alpha Bank" stroke={GREEN} strokeWidth={2} dot={false} isAnimationActive={false} />
             <Line type="monotone" dataKey="nifty" name="Nifty 50" stroke="#94A3B8" strokeWidth={1.5} dot={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
@@ -352,15 +322,12 @@ function SummaryGrid() {
 
 /* ---------- Market pulse ---------- */
 function MarketPulse({ stocks }: any) {
-  if (!stocks || stocks.length === 0) return null;
-  
-  // Use mock data if API doesn't return changes yet
   const mockStocks = [
-    { ticker: 'HDFCBANK', change: 2.14 },
-    { ticker: 'ICICIBANK', change: 1.67 },
-    { ticker: 'SBIN', change: 1.12 },
-    { ticker: 'BEL', change: -0.95 },
-    { ticker: 'KOTAKBANK', change: -1.2 },
+    { ticker: 'HDFCBANK', change: 1.14 },
+    { ticker: 'ICICIBANK', change: 0.87 },
+    { ticker: 'SBIN', change: 0.52 },
+    { ticker: 'AXISBANK', change: -0.45 },
+    { ticker: 'KOTAKBANK', change: -0.82 },
   ];
 
   const sorted = [...mockStocks].sort((a, b) => b.change - a.change);
@@ -418,17 +385,9 @@ function StocksTable({ stocks, loading }: any) {
         <div className="flex items-center gap-2">
           <label className="flex w-[160px] items-center gap-1.5 rounded-md border border-white/10 bg-[#111] px-2 py-[6px] sm:w-[200px]">
             <Search size={12} className="text-slate-400" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search stocks..."
-              className="w-full bg-transparent text-[11px] text-white placeholder:text-slate-500 focus:outline-none"
-            />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stocks..." className="w-full bg-transparent text-[11px] text-white placeholder:text-slate-500 focus:outline-none" />
           </label>
-          <button
-            onClick={() => setAll((v) => !v)}
-            className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#111] px-3 py-[6px] text-[11px] font-semibold"
-          >
+          <button onClick={() => setAll((v) => !v)} className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#111] px-3 py-[6px] text-[11px] font-semibold">
             {all ? 'Show Less' : 'View All'} <ArrowRight size={12} />
           </button>
         </div>
@@ -453,27 +412,16 @@ function StocksTable({ stocks, loading }: any) {
               <tr><td colSpan={5} className="py-8 text-center text-[12px] text-slate-500">No stocks found.</td></tr>
             )}
             {rows.map((s: any) => {
-              // Default mock data if API doesn't provide it yet
               const change = s.change || (Math.random() * 2 - 1);
               const weightage = s.weightage || (Math.random() * 15 + 1);
               const up = change >= 0;
               
               return (
                 <tr key={s.ticker} className="border-b border-gray-800/50 transition-colors hover:bg-white/[0.02]">
-                  <td className="py-3 pl-4 pr-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[12px] font-semibold">{s.ticker}</span>
-                    </div>
-                  </td>
+                  <td className="py-3 pl-4 pr-2"><div className="flex items-center gap-2.5"><span className="text-[12px] font-semibold">{s.ticker}</span></div></td>
                   <td className="px-2 py-3 text-[12px] text-slate-300">{s.name || s.ticker}</td>
-                  <td className={`px-2 py-3 text-right text-[12px] font-medium ${up ? 'text-[#22E58F]' : 'text-[#FF4D5E]'}`}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {fmt(s.price)}
-                    </span>
-                  </td>
-                  <td className={`px-2 py-3 text-right text-[12px] font-semibold ${up ? 'text-[#22E58F]' : 'text-[#FF4D5E]'}`}>
-                    {signed(change)}%
-                  </td>
+                  <td className={`px-2 py-3 text-right text-[12px] font-medium ${up ? 'text-[#22E58F]' : 'text-[#FF4D5E]'}`}><span className="inline-flex items-center gap-1.5">{fmt(s.price)}</span></td>
+                  <td className={`px-2 py-3 text-right text-[12px] font-semibold ${up ? 'text-[#22E58F]' : 'text-[#FF4D5E]'}`}>{signed(change)}%</td>
                   <td className="px-2 py-3 text-right text-[12px] font-medium">{weightage.toFixed(2)}%</td>
                 </tr>
               );
@@ -491,13 +439,13 @@ export default function BankDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
-    fetch(`/api/index-data?index=bank`)
+    // Bank API fetch 
+    fetch(`/api/index-data?index=bank`) 
       .then((r) => {
         if (!r.ok) throw new Error(`Request failed (${r.status})`);
         return r.json();
@@ -513,46 +461,28 @@ export default function BankDashboard() {
   const stocks = data?.stocks || [];
 
   return (
-    <div className="flex min-h-screen bg-[#050505] text-white font-sans relative overflow-hidden pb-16 md:pb-0">
-      
-      {/* Ambient Background Glows */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
+      {error && (
+        <div className="mt-3 rounded-md border border-[#FF4D5E]/30 bg-[#FF4D5E]/10 px-4 py-3 text-[13px] text-[#FF4D5E]">
+          {error}
+        </div>
+      )}
 
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      
-      <div className="flex flex-col flex-1 w-full md:ml-60 relative z-10">
-        <TopBar onMenu={() => setMenuOpen(!menuOpen)} />
+      <div className="mt-2 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0">
+          <Hero data={hero} range={range} setRange={setRange} />
+          <MainChart chartData={chartData} range={range} loading={loading} />
+        </div>
         
-        <main className="flex-1 overflow-x-hidden p-4 md:p-8">
-          <div className="max-w-[1400px] mx-auto">
-            {error && (
-              <div className="mt-3 rounded-md border border-[#FF4D5E]/30 bg-[#FF4D5E]/10 px-4 py-3 text-[13px] text-[#FF4D5E]">
-                {error}
-              </div>
-            )}
-
-            <div className="mt-2 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_280px]">
-              {/* Main Left Content */}
-              <div className="min-w-0">
-                <Hero data={hero} range={range} setRange={setRange} />
-                <MainChart chartData={chartData} range={range} loading={loading} />
-              </div>
-              
-              {/* Right Panel */}
-              <aside className="min-w-0 bg-[#0A0A0A]/50 border border-gray-800 rounded-2xl p-5 h-fit">
-                <PortfolioBreakdown count={hero.constituents} />
-                <Performance />
-              </aside>
-            </div>
-
-            <SummaryGrid />
-            <MarketPulse stocks={stocks} />
-            <StocksTable stocks={stocks} loading={loading} />
-          </div>
-        </main>
+        <aside className="min-w-0 bg-[#0A0A0A]/50 border border-gray-800 rounded-2xl p-5 h-fit">
+          <PortfolioBreakdown count={hero.constituents} />
+          <Performance />
+        </aside>
       </div>
-      
-      <BottomNav />
+
+      <SummaryGrid />
+      <MarketPulse stocks={stocks} />
+      <StocksTable stocks={stocks} loading={loading} />
     </div>
   );
 }
