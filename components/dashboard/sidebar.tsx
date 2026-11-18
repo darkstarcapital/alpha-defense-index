@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3, Briefcase, Eye, Home, Newspaper, Settings, ShieldCheck, TrendingUp, Landmark
+  BarChart3, Briefcase, Eye, Home, Newspaper, Settings, ShieldCheck, TrendingUp, Landmark, Monitor
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,7 @@ const NAV = [
   { label: 'Home', icon: Home, href: '/' }, 
   { label: 'Defense Index', icon: ShieldCheck, href: '/index/defense' },
   { label: 'Bank Index', icon: Landmark, href: '/index/bank' },
+  { label: 'IT Index', icon: Monitor, href: '/index/it' }, // <-- NEW IT INDEX ADDED HERE
   { label: 'Market News', icon: Newspaper, href: '/news' }, 
   { label: 'Portfolio', icon: Briefcase, href: '#' }, 
   { label: 'Watchlist', icon: Eye, href: '#' },
